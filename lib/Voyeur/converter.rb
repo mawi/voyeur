@@ -4,6 +4,10 @@ module Voyeur
     attr_reader :output_video
     attr_reader :status
 
+    attr_reader :duration
+    attr_reader :time
+    attr_reader :percentage
+
     def self.create(options)
       constant = Voyeur
       klass = "#{options[:format].capitalize}"
@@ -40,9 +44,26 @@ module Voyeur
       command = "ffmpeg -i #{@input_video.filename} #{self.convert_options} #{@output_video.filename}"
       out, err = ""
 
-      status = Open4::popen4(command) do |pid, stdin, stdout, stderr|
-        out = stdout.read.strip
-        err = stderr.read.strip
+        status = Open4::popen4(command) do |pid, stdin, stdout, stderr|
+        begin
+          while (line = stderr.readpartial(4096)) do
+              if line =~ Voyeur::Misc::Duration::DURATION_REGEX
+                if @duration
+                  @time = Voyeur::Misc::Duration.new(line) 
+                else
+                  @duration = Voyeur::Misc::Duration.new(line) 
+                  @time = Voyeur::Misc::Duration.new("00:00:00.00")
+                end
+                @input_video.convert_duration = @duration
+                @input_video.convert_time = @time
+              end
+          end
+       rescue => e
+          out = stdout.read.strip
+          err = stderr.read.strip
+          @time = @duration
+          @input_video.convert_time = @time
+        end
       end
 
       error_message = err.split('\n').last

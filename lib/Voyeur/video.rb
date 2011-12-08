@@ -1,8 +1,13 @@
 module Voyeur
   class Video
     attr_reader :filename
+    attr_accessor :convert_duration
+    attr_accessor :convert_time
+    
     def initialize(options)
       @filename = options[:filename]
+      @convert_time = Voyeur::Misc::Duration.new("00:00:00.00")
+      @convert_duration = Voyeur::Misc::Duration.new("00:00:00.00")
     end
 
     def convert(options)
