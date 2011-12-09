@@ -41,36 +41,40 @@ module Voyeur
     end
 
     def call_external_converter
-      command = "ffmpeg -i #{@input_video.filename} #{self.convert_options} #{@output_video.filename}"
-      out, err = ""
+      command = "ffmpeg -y -i #{@input_video.filename} #{self.convert_options} #{@output_video.filename}"
+      out = err = ""
+      status = Open4::popen4(command) do |pid, stdin, stdout, stderr|
+        out = err = "" 
 
-        status = Open4::popen4(command) do |pid, stdin, stdout, stderr|
-        begin
-          while (line = stderr.readpartial(4096)) do
-              if line =~ Voyeur::Misc::Duration::DURATION_REGEX
-                if @duration
-                  @time = Voyeur::Misc::Duration.new(line) 
-                else
-                  @duration = Voyeur::Misc::Duration.new(line) 
-                  @time = Voyeur::Misc::Duration.new("00:00:00.00")
-                end
-                @input_video.convert_duration = @duration
-                @input_video.convert_time = @time
-              end
+        until(stderr.eof?) do
+          line = stderr.readpartial(4096)
+          err << line
+
+          if line =~ Voyeur::Misc::Duration::DURATION_REGEX
+            if @duration
+              @time = Voyeur::Misc::Duration.new(line) 
+            else
+              @duration = Voyeur::Misc::Duration.new(line) 
+              @time = Voyeur::Misc::Duration.new("00:00:00.00")
+            end
+            @input_video.convert_duration = @duration
+            @input_video.convert_time = @time
           end
-       rescue => e
-          out = stdout.read.strip
-          err = stderr.read.strip
-          @time = @duration
-          @input_video.convert_time = @time
+          
         end
+        
+        @input_video.convert_time = @duration
+        out = stdout.read.strip
+        
+       
       end
+       error_message = err.split('\n').last
 
-      error_message = err.split('\n').last
-
-      @status = { status: status.exitstatus, stdout: out, stderr: err,
-        error_message: error_message, video: @output_video }
-      return @status
+        @status = { status: status.exitstatus, stdout: out, stderr: err,
+                  error_message: error_message, video: @output_video }
+        return @status
+      
+      
     end
   end
 end
